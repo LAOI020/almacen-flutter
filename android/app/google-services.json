@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "921239618490",
+    "firebase_url": "https://almacen-fe726.firebaseio.com",
+    "project_id": "almacen-fe726",
+    "storage_bucket": "almacen-fe726.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:921239618490:android:35c9ad30696764853d1383",
+        "android_client_info": {
+          "package_name": "com.angelorozco.almacen.requisicion"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "921239618490-mqi7bdm8h2jkmmr3jc0h5li2depj6fcu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXHQgx_EqyWLvz22hxYGszTWw7Y90u0-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "921239618490-mqi7bdm8h2jkmmr3jc0h5li2depj6fcu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
