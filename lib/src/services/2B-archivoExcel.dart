@@ -6,95 +6,112 @@ import 'package:almacen/src/widgets/mensajes.dart';
 import 'package:almacen/src/widgets/widgettss.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server/gmail.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:get/route_manager.dart';
 
 class Service2B {
 
-  ventana(BuildContext context){
+  ventana(String oficina){
 
     TextEditingController codigoControlador = TextEditingController();
+    
     bool codigoCorrecto;
+    
     int contadorREF = 0;
 
-    return showDialog(
-      context: context,
-      builder: (context){
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(25.0))
-          ),
+    String emailFinanzas = ''; 
 
-          title: Text('Finanzas'),
+    return Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(25.0))
+        ),
 
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
+        title: Text('Finanzas'),
+
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
                 
-                Widgettss().etiquetaText(titulo: 'Enviar correo'),
+              Widgettss().etiquetaText(titulo: 'Enviar correo'),
 
-                Input(
-                  etiqueta: 'Codigo',
-                  controlador: codigoControlador,
-                  tipo: TextInputType.number,
-                  oscurecer: true,
-                  next: (v){ FocusScope.of(context).nextFocus(); },
-                ),
-              ],
-            ),
+              Input(
+                etiqueta: 'Codigo',
+                controlador: codigoControlador,
+                tipo: TextInputType.number,
+                oscurecer: true,
+                next: (v){ },
+              ),
+            ],
           ),
+        ),
 
-          actions: [
-            MaterialButton(
-              child: Text('Listo'),
-              onPressed: () async{
-                if(codigoControlador.text != ''){                  
+        actions: [
+          MaterialButton(
+            child: Text('Listo'),
+            onPressed: () async{
+              if(codigoControlador.text != ''){                  
                 
-                  FirebaseFirestore.instance
-                    .collection('cholula')
-                    .doc('finanzas')
-                    .get().then((dooc){
+                FirebaseFirestore.instance
+                  .collection(oficina)
+                  .doc('finanzas')
+                  .get().then((dooc){
 
-                      contadorREF = dooc.data()['contador'];
+                    contadorREF = dooc.data()['contador'];
 
-                      if(dooc.data()['codigo'] != codigoControlador.text){
+                    emailFinanzas = dooc.data()['correo'];
 
-                        Mensajes().mensajeAlerta(context, 'Codigo incorrecto');                        
+                    if(dooc.data()['codigo'] != codigoControlador.text){
 
-                      } else {
-                        codigoCorrecto = true;
-                      }
+                      Mensajess().alertaMensaje('Codigo incorrecto');
 
-                    }).then((value){
+                    } else {
+                      codigoCorrecto = true;
+                    }
+
+                    dooc.reference.update({ 'contador': FieldValue.increment(1) });
+
+                  }).then((value){
                       
-                      if(codigoCorrecto == true){
-                        
-                        Navigator.pop(context);
-                        Mensajes().mensajeAlerta(context, 'Listo, el excel estara en el correo de finanzas en unos minutos');
-                        
-                        ponerDatosExcel(contadorREF);
-                      }
+                    if(codigoCorrecto == true){
 
-                    });
-                }
-              },
-            )
-          ],
-        );
-      }
+                      FirebaseFirestore.instance
+                        .collection('FUNCTIONS')
+                        .doc('enviarEmailFinanzas')
+                        .collection('detalles')
+                        .add({
+                          'fecha': DateTime.now().toString(),
+                          'oficina': oficina
+                        });
+                        
+                      Get.back();
+                      Mensajess().alertaMensaje('Listo, el excel estara en el correo de finanzas en unos minutos');                       
+                        
+                      ponerDatosExcel(oficina, contadorREF, emailFinanzas);
+                    }
+
+                  });
+              }
+            },
+          )
+        ],
+      )
+    
     );
   }
 
-  void ponerDatosExcel(int contadorREF){
+  void ponerDatosExcel(String oficina,int contadorREF,String emailFinanzas){
 
     var libro = Excel.createExcel();
 
     int indx = 0;
 
     FirebaseFirestore.instance
-      .collection('cholula')
+      .collection(oficina)
       .doc('finanzas')
       .collection('pedidos')
       .get().then((pedidos) async{
@@ -139,7 +156,7 @@ class Service2B {
           libro.updateCell(pedido.id, CellIndex.indexByString('K10'), 'DINERO VERDE');
 
           await FirebaseFirestore.instance
-            .collection('cholula')
+            .collection(oficina)
             .doc('finanzas')
             .collection('pedidos')
             .doc(pedido.id)
@@ -178,33 +195,25 @@ class Service2B {
                     ..createSync(recursive: true)
                     ..writeAsBytesSync(bytess);
 
-                  final storageREF = FirebaseStorage.instance
-                                      .ref()
-                                      .child('cholula-$contadorREF.xlsx');
-                                      //.child('cholulaFinanzas.xlsx');
+                  // ignore: deprecated_member_use
+                  final smtpServer = gmail('enviarexcelfinanzas@gmail.com', 'arjomabelu19' );
 
-                  StorageUploadTask cargarArchivo = storageREF.putFile(excelListo);
+                  final mensaje = Message()
+                    ..from = Address('enviarexcelfinanzas@gmail.com', 'LAOI')
+                    ..recipients.add(emailFinanzas)
+                    ..subject = 'DETALLES PEDIDOS'
+                    ..text = 'DETALLES PEDIDOS'
+                    ..attachments = [
+                      FileAttachment(excelListo)
+                    ];
 
-                  StorageTaskSnapshot cargaCompleta = await cargarArchivo.onComplete;
-
-                  if(cargarArchivo.isComplete){
-
-                    cargaCompleta.ref.getDownloadURL().then((value){
-
-                      FirebaseFirestore.instance
-                        .collection('FUNCTIONS')
-                        .doc('enviarEmailFinanzas')
-                        .collection('detalles')
-                        .add({
-                          'urlArchivo': value.toString(),
-                          'oficina': 'cholula',          
-                          'fecha': DateTime.now().toString()          
-                        });
-
-                    });
-                    
+                  try {
+                    final enviarEmail = await send(mensaje, smtpServer);
                     excelListo.delete().then((value) => debugPrint('archivo borrado de cache'));
 
+                    debugPrint(enviarEmail.toString());
+                  } on MailerException catch (e) {
+                    debugPrint(e.toString());
                   }
 
                               

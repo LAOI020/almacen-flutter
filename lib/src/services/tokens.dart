@@ -1,47 +1,48 @@
 
-
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:toast/toast.dart';
+import 'package:get/route_manager.dart';
 
 class Tokens {
 
 
-  iniciarNotificaciones(BuildContext context){
+  iniciarNotificaciones(){
 
     FirebaseMessaging _firebaseMessaging = FirebaseMessaging();
 
     _firebaseMessaging.requestNotificationPermissions();
-   
-    print('se iniciarion las notificaciones');
     
     _firebaseMessaging.configure(      
 
       onMessage: (info) async{ //CUANDO ESTA ABIERTA LA APP
         debugPrint("======On Message====");
-        print(info);
+        //print(info);
 
         String argumento = 'no-data';
         
         if(Platform.isAndroid){
           argumento = info['notification']['body'] ?? 'no-data';
         }
-        
-        Toast.show(argumento, context, duration: 3, backgroundColor: Colors.black,);
+
+        Get.snackbar(
+          'Nuevo pedido', argumento,
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.white
+        );
 
       },
 
       onLaunch: (info) async{ //CUANDO ESTA FINALIZADA LA APP
         debugPrint("=====ON LAUNCH");
-        print(info);
+        //print(info);
       },
 
       onResume: (info) async{ //CUANDO ESTA EN 2DO PLANO
-        print("=====ON RESUME");
-        print(info);
+        debugPrint("=====ON RESUME");
+        //print(info);
       },
       
 
@@ -50,22 +51,36 @@ class Tokens {
   }
 
 
-  void verYactualizarToken(String negocio,String nombreCodigo){
+  void verYactualizarToken(String oficina,String negocio,String puestoPersona){
 
     FirebaseMessaging _firebaseMessaging = FirebaseMessaging();
 
-    if(nombreCodigo != 'finanzas'){
+    if(puestoPersona != 'finanzas' && puestoPersona != 'administracion'){
 
       _firebaseMessaging.getToken().then((token){
         FirebaseFirestore.instance
-          .collection('cholula')
+          .collection(oficina)
           .doc(negocio)
           .collection('codigos')
-          .doc(nombreCodigo)
+          .doc(puestoPersona)
           .update({
             'token': token
           });
       });
+
+    } else {
+
+      if(puestoPersona == 'administracion'){
+
+        _firebaseMessaging.getToken().then((token){
+          FirebaseFirestore.instance
+            .collection(oficina)
+            .doc('finanzas')
+            .update({
+              'tokenAdministracion': token
+            });
+        });
+      }
 
     }
 

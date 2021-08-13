@@ -17,8 +17,8 @@ class Input extends StatelessWidget {
       textInputAction: TextInputAction.next,
       onSubmitted: next,
       decoration: InputDecoration(
-        labelStyle: TextStyle(fontSize: 17.0),
-        labelText: etiqueta,
+        hintStyle: TextStyle(fontSize: 17.0),
+        hintText: etiqueta,
       ),
       //maxLines: null,
       keyboardType: tipo,

@@ -1,75 +1,155 @@
 
 //PANTALLA QUE SE VE CUANDO HACEN INVENTARIO
 
-import 'package:almacen/src/services/2A.dart';
+import 'package:almacen/src/controladores/2A.dart';
 import 'package:almacen/src/widgets/widgettss.dart';
 import 'package:almacen/src/widgets/input.dart';
 import 'package:almacen/src/widgets/mensajes.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/route_manager.dart';
 
 
-class PantallaHacerInventario {
+class PantallaHacerInventario extends StatelessWidget {
 
-  
-  Widget grupos(BuildContext context,String negocio){
+  final String oficina;
+  final String negocio;
 
-    double width = MediaQuery.of(context).size.width;
+  PantallaHacerInventario({this.oficina,this.negocio});
 
-    return StreamBuilder(
-      stream: FirebaseFirestore.instance.collection('cholula')
-                                        .doc(negocio)
-                                        .collection('almacen')
-                                        .orderBy('grupo')
-                                        .snapshots(),
-      builder: (context, snapshot){
-        if (snapshot.data == null)
-          return Center(child: CircularProgressIndicator()); 
+  final ScrollController scrollControlador = ScrollController();
 
-        return ListView.builder(
-          itemCount: snapshot.data.documents.length,
-          itemBuilder: (context, index){
-             
-            bool separar;
-            bool ultimoItem;
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        StreamBuilder(
+          stream: FirebaseFirestore.instance.collection(oficina)
+                                            .doc(negocio)
+                                            .collection('grupos')
+                                            .orderBy('indx')
+                                            .snapshots(),
+          builder: (context, snapshot){
+            if (snapshot.data == null)
+              return Center(child: CircularProgressIndicator()); 
 
-            if(index != 0){
-              if(snapshot.data.documents[index].data()['grupo'] 
-                 != 
-                snapshot.data.documents[index - 1].data()['grupo']
-                ){
-                  separar = true;
+            return ListView.builder(
+              controller: scrollControlador,
+
+              itemCount: snapshot.data.documents.length,
+              itemBuilder: (context, index){
+
+                bool ultimo;
+
+                if(index + 1 == snapshot.data.documents.length){
+                  ultimo = true;
                 }
+
+                return lineaGrupo(
+                  data: snapshot.data.documents[index], 
+                  oficina: oficina, 
+                  negocio: negocio,
+                  ultimo: ultimo
+                );
+
+              }
+            );
+          },
+        ),
+
+        //SCROLL CONTROLADORES
+        Align(
+          alignment: Alignment.topRight,
+
+          child: Widgettss().botonIcono(Icons.arrow_circle_up, 50.0, () { 
+            scrollControlador.animateTo(
+              0, duration: Duration(milliseconds: 500), curve: Curves.bounceIn
+            );
+          }),
+        ),
+
+        //BOTON VERIFICAR INVENTARIO
+        Align(
+          alignment: Alignment.bottomCenter,
+
+          child: GetBuilder<UnidadNegocioController>(
+            builder: (_){
+              return Widgettss().botonIcono(Icons.check_box, 50.0, () { 
+                _.verificarInventario();
+              });
             }
-
-            if(index + 1 == snapshot.data.documents.length){
-              ultimoItem = true;
-            }
-
-            return width < 580.0 ? 
-              nombreMMovil(
-                context, snapshot.data.documents[index], index, 
-                separar, 
-                ultimoItem,
-                negocio
-              )
-              :
-              nombre(
-                context, snapshot.data.documents[index], index, 
-                separar, 
-                ultimoItem,
-                negocio
-              );
-
-          }
-        );
-      },
+          ),
+        )
+      ],
     );
   }
 
-  Widget nombre(BuildContext context,DocumentSnapshot data, 
-                  int index, bool separar,bool ultimoItem,String negocio
-              ){
+
+  Widget lineaGrupo({DocumentSnapshot data,String oficina,String negocio,bool ultimo}){
+    return Column(
+      children: [
+
+        Divider(thickness: 7.0,color: Color(int.parse('0xff${data.data()['color']}'))),
+
+        StreamBuilder(
+          stream: FirebaseFirestore.instance
+                    .collection(oficina)
+                    .doc(negocio)
+                    .collection('grupos')
+                    .doc(data.id)
+                    .collection('productos')
+                    .snapshots(),
+
+          builder: (context, snap){
+
+            if(snap.data == null){
+              return Center(child: CircularProgressIndicator());
+            }    
+                    
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+                      
+              itemCount: snap.data.documents.length,
+              itemBuilder: (context, indeex){
+
+                bool ultimoItemm;
+
+                if(indeex + 1 == snap.data.documents.length && ultimo == true){
+                  ultimoItemm = true;
+                }
+
+                return Get.width < 580.0 ? 
+                  productosMovil(
+                    oficina: oficina,
+                    negocio: negocio,
+
+                    data: snap.data.documents[indeex],
+                    index: indeex,
+                    ultimoItem: ultimoItemm
+                  )
+                  :
+                  productos(
+                    oficina: oficina,
+                    negocio: negocio,
+
+                    data: snap.data.documents[indeex],
+                    index: indeex,
+                    ultimoItem: ultimoItemm,
+                  );
+
+              }
+            );
+          },
+        )
+      ],
+    );
+  }
+
+  Widget productos({DocumentSnapshot data,int index,bool ultimoItem,
+                    String negocio,String oficina
+              }){
 
     String colorString = data.data()['color'] == null ? "fba21c" : data.data()['color'];
 
@@ -77,29 +157,25 @@ class PantallaHacerInventario {
       padding: const EdgeInsets.only(
         top: 10.0,
         bottom: 10.0,
-        left: 30.0,
+        left: 15.0,
         right: 10.0
       ),
 
       child: Column(
-        children: [    
-
-          SizedBox(height: index == 0 ? 30.0 : 0.0,),
-          
-          separar != true ?
-            SizedBox(height: 0.0,)
-            :
-            Padding(
-              padding: EdgeInsets.only(top: 15.0, bottom: 30.0),
-              child: Divider(thickness: 5.0, height: 5.0, color: Colors.black,)
-            ),
+        children: [
 
           IntrinsicHeight(      
             child: GestureDetector(
 
               onTap: (){ 
                 if(data.data()['color'] == '7f7f7f'){
-                  modificarExistencia(context, negocio, data);
+
+                  modificarExistencia(
+                    oficina: oficina,
+                    negocio: negocio,
+                    data: data
+                  );
+
                 }
               },
 
@@ -110,7 +186,7 @@ class PantallaHacerInventario {
                   //NOMBRE PRODUCTO
                   Container(
                     
-                    width: MediaQuery.of(context).size.width * 0.5,
+                    width: Get.width * 0.5,
 
                     decoration: BoxDecoration(
                       color: Color(int.parse("0xff$colorString")), //fba21c NARANJA
@@ -185,11 +261,7 @@ class PantallaHacerInventario {
             SizedBox(height: 0.0,)
             :
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20.0),
-
-              child: Widgettss().botonIcono(Icons.check_box, 50.0, () { 
-                Services2A().verificarInventario(context, negocio);
-              }),
+              padding: const EdgeInsets.symmetric(vertical: 40.0),              
             )
 
         ],
@@ -198,9 +270,9 @@ class PantallaHacerInventario {
   }
 
 
-  Widget nombreMMovil(BuildContext context,DocumentSnapshot data, 
-                  int index, bool separar,bool ultimoItem,String negocio
-              ){
+  Widget productosMovil({DocumentSnapshot data,int index,bool ultimoItem,
+                          String negocio,String oficina
+                        }){
 
     String colorString = data.data()['color'] == null ? "fba21c" : data.data()['color'];
 
@@ -208,29 +280,24 @@ class PantallaHacerInventario {
       padding: const EdgeInsets.only(
         top: 10.0,
         bottom: 10.0,
-        left: 30.0,
+        left: 15.0,
         right: 10.0
       ),
 
       child: Column(
-        children: [    
-
-          SizedBox(height: index == 0 ? 30.0 : 0.0,),
-          
-          separar != true ?
-            SizedBox(height: 0.0,)
-            :
-            Padding(
-              padding: EdgeInsets.only(top: 15.0, bottom: 30.0),
-              child: Divider(thickness: 5.0, height: 5.0, color: Colors.black,)
-            ),
+        children: [
 
           IntrinsicHeight(      
             child: GestureDetector(
 
               onTap: (){ 
                 if(data.data()['color'] == '7f7f7f'){
-                  modificarExistencia(context, negocio, data);
+
+                  modificarExistencia(
+                    oficina: oficina,
+                    negocio: negocio,
+                    data: data
+                  );
                 }
               },
 
@@ -240,6 +307,8 @@ class PantallaHacerInventario {
 
                   //NOMBRE PRODUCTO
                   Expanded(
+                    flex: 2,
+
                     child: Container(
                       decoration: BoxDecoration(
                         color: Color(int.parse("0xff$colorString")), //fba21c NARANJA
@@ -259,20 +328,6 @@ class PantallaHacerInventario {
                       )
                     ),
                   ),
-                  
-                  //MEDIDA O UNIDAD
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Color(int.parse("0xff$colorString")),
-                      border: Border.all(color: Colors.white),
-                      borderRadius: BorderRadius.only()
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12.0, bottom: 12.0, left: 5.0, right: 5.0),
-
-                      child: Widgettss().etiquetaText(titulo: data.data()['medida'],),
-                    )
-                  ),
                                     
                 ],
               ),
@@ -284,21 +339,46 @@ class PantallaHacerInventario {
               
               onTap: (){ 
                 if(data.data()['color'] == '7f7f7f'){
-                  modificarExistencia(context, negocio, data);
+
+                  modificarExistencia(
+                    oficina: oficina,
+                    negocio: negocio,
+                    data: data
+                  );
+
                 }
               },
 
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+
+                  //MEDIDA O UNIDAD
+                  Expanded(
+
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(int.parse("0xff$colorString")),
+                        border: Border.all(color: Colors.white),
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(25.0)
+                        )
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12.0, bottom: 12.0, left: 5.0, right: 5.0),
+
+                        child: Widgettss().etiquetaText(titulo: data.data()['medida'],),
+                      )
+                    ),
+                  ),
+
                   //STOCK
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(int.parse("0xff$colorString")),
                           border: Border.all(color: Colors.white),  
-                          borderRadius: BorderRadius.only(
-                            bottomLeft: Radius.circular(25.0)
-                          )
+                          borderRadius: BorderRadius.only()
                         ),
                         child: Padding(
                           padding: const EdgeInsets.only(top: 12.0, bottom: 12.0, left: 10.0, right: 10.0),
@@ -331,13 +411,7 @@ class PantallaHacerInventario {
             SizedBox(height: 0.0,)
             :
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20.0),
-
-              child: Widgettss().botonIcono(Icons.check_box, 50.0, () { 
-
-                Services2A().verificarInventario(context, negocio);
-                
-              }),
+              padding: const EdgeInsets.symmetric(vertical: 40.0),
             )
 
         ],
@@ -346,67 +420,63 @@ class PantallaHacerInventario {
   }
 
 
-  modificarExistencia(BuildContext context,String negocio,DocumentSnapshot data){
+  modificarExistencia({String oficina,String negocio,DocumentSnapshot data}){
 
     TextEditingController cantidadControlador = TextEditingController();
 
-    return showDialog(
-      context: context,
-      builder: (context){
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(25.0))
-          ),
+    return Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(25.0))
+        ),
           
-          title: Text(negocio),
+        title: Text(negocio),
 
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                Widgettss().etiquetaText(titulo: data.id),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              Widgettss().etiquetaText(titulo: data.id),
 
-                SizedBox(height: 8.0),
+              SizedBox(height: 8.0),
 
-                Input(
-                  etiqueta: 'Cantidad',
-                  controlador: cantidadControlador,
-                  tipo: TextInputType.number,
+              Input(
+                etiqueta: 'Cantidad',
+                controlador: cantidadControlador,
+                tipo: TextInputType.number,
 
-                  next: (valor){
-                    if(cantidadControlador.text != ''){
-                      try {
-                        double cantidadConversion = double.parse(cantidadControlador.text);
+                next: (valor){
+                  if(cantidadControlador.text != ''){
+                    try {
+                      double cantidadConversion = double.parse(cantidadControlador.text);
 
-                        if(cantidadConversion > data.data()['stock']){
+                      if(cantidadConversion > data.data()['stock']){
                           
-                          return Mensajes().mensajeAlerta(context, 'No puedes superar el stok');
+                        return Mensajess().alertaMensaje('No puedes superar el stok');
 
-                        } else {
+                      } else {
 
-                          data.reference.update({
-                            'actual': cantidadConversion,
-                            'color': "22b14c" //VERDE
-                          });
-
-                        }
-                        
-
-                        Navigator.pop(context);
-
-                      } catch (e) {
+                        data.reference.update({
+                          'actual': cantidadConversion,
+                          'color': "fba21c" //VERDE
+                        });
 
                       }
                       
-                    }
-                  },
-                ),
+                      Get.back();
 
-                SizedBox(height: 10.0,),
-              ],
-            ),
+                    } catch (e) {
+
+                    }
+                      
+                  }
+                },
+              ),
+
+              SizedBox(height: 10.0,),
+            ],
           ),
-        );
-      }
+        ),
+      )
     );
 
   }
@@ -414,3 +484,6 @@ class PantallaHacerInventario {
 
 
 }
+
+
+  
